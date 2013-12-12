@@ -3,6 +3,10 @@ gitlab-ci-runner-scala
 
 A runner for GitLab CI written in Scala (based on https://github.com/virtualmarc/gitlab-ci-runner-win)
 
+Because it runs on the JVM, it's platform agnostic.
+
+Note: It does not generate SSH keys for you. It expects to find the public key in $HOME/.ssh/id_rsa.pub.
+
 Usage:
  - Run `sbt package` to create the jar file
  - Run something to the effect of

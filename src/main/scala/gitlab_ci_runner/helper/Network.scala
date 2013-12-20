@@ -21,23 +21,25 @@ import uk.co.bigbeeconsultants.http.request.RequestBody
 object Network {
   JSON.globalNumberParser = _.toInt
 
-  private def put(url: String, content: String): Option[String] = try {
+  private def request(url: String, content: String)(makeReq: (URL, RequestBody) => Request) = {
     val httpClient = new HttpClient
-    val req = Request.put(new URL(url), RequestBody(content, MediaType.APPLICATION_FORM_URLENCODED))
-    Some(httpClient.makeRequest(req).body.asString)
+    val req = makeReq(new URL(url), RequestBody(content, MediaType.APPLICATION_FORM_URLENCODED))
+    val resp = httpClient.makeRequest(req)
+    if (resp.status.isSuccess)
+      Some(resp.body.asString)
+    else
+      None
+  }
+
+  private def put(url: String, content: String): Option[String] = try {
+    request(url, content)((url, body) => Request.put(url, body))
   } catch {
     case e: Exception => None
   }
 
   private def post(url: String, content: String, tries: Int = 5): Option[String] =
     if (tries <= 0) None else try {
-      println(s"post($url, $content, $tries)")
-      val httpClient = new HttpClient
-      val req = Request.post(new URL(url), Some(RequestBody(content, MediaType.APPLICATION_FORM_URLENCODED)))
-      println("req: " + req)
-      val ret = httpClient.makeRequest(req).body.asString
-      println("POST returned: " + ret)
-      Some(ret)
+      request(url, content)((url, body) => Request.post(url, Some(body)))
     } catch {
       case e: Exception =>
         println(e)
@@ -49,7 +51,6 @@ object Network {
 
   def registerRunner(pubKey: String, token: String): Option[String] = {
     val postBody = s"token=${URLEncoder.encode(token)}&public_key=${URLEncoder.encode(pubKey)}"
-    println("Posting: " + postBody)
     post(apiUrl + "/runners/register.json", postBody) flatMap JSON.parseRaw flatMap {
       case JSONObject(resp) =>
         try {
@@ -62,8 +63,7 @@ object Network {
   }
 
   def getBuild: Option[BuildInfo] = {
-    println("Checking for builds...")
-    val postBody = s"token=${ URLEncoder.encode(Config.token) }"
+    val postBody = s"token=${URLEncoder.encode(Config.token)}"
     post(apiUrl + "/builds/register.json", postBody) flatMap {
       case "" =>
         println("Nothing")
@@ -72,14 +72,21 @@ object Network {
         try {
           JSON.parseRaw(resp) flatMap {
             case JSONObject(obj) =>
-              println("Got JSON: " + obj)
-              Some(BuildInfo(
-                id = obj("id").toString.toInt,
-                projectId = obj("project_id").toString.toInt,
-                commands = obj("commands").toString,
-                repoUrl = obj("repo_url").toString,
-                reference = obj("sha").toString,
-                refName = obj("ref").toString))
+              if (obj.keySet == Set("message")) {
+                println("ERROR: " + obj("message"))
+                None
+              } else if (Set("id", "project_id", "commands", "repo_url", "sha", "ref") subsetOf obj.keySet)
+                Some(BuildInfo(
+                  id = obj("id").toString.toInt,
+                  projectId = obj("project_id").toString.toInt,
+                  commands = obj("commands").toString,
+                  repoUrl = obj("repo_url").toString,
+                  reference = obj("sha").toString,
+                  refName = obj("ref").toString))
+              else {
+                println("Unrecognized response: " + obj)
+                None
+              }
             case _ =>
               println("Invalid JSON: " + resp)
               None

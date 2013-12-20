@@ -1,5 +1,9 @@
 import AssemblyKeys._
 
+organization := "io.github.nafg"
+
+name := "gitlab-ci-runner-scala"
+
 libraryDependencies ++= Seq(
     "uk.co.bigbeeconsultants" %% "bee-client" % "0.21.+",
     "org.slf4j" % "slf4j-api" % "1.7.+",

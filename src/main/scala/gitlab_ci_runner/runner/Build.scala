@@ -5,6 +5,7 @@ import java.io.File
 import java.io.InputStreamReader
 
 import scala.collection.mutable.ListBuffer
+import scala.util.Properties
 
 import gitlab_ci_runner.conf.Config
 import gitlab_ci_runner.helper.json.BuildInfo
@@ -25,7 +26,7 @@ class Build(val buildInfo: BuildInfo) {
 
   var state: State = State.Waiting
 
-  var timeout = 7200
+  var timeout = 7200 //TODO
 
   def run = {
     state = State.Running
@@ -33,18 +34,20 @@ class Build(val buildInfo: BuildInfo) {
     projectsDir.mkdirs()
 
     val gitCmd = if (new File(projectDir, ".git").exists)
-      fetchCmd + "\n" + checkoutCmd
+      fetchCmd + Properties.lineSeparator + checkoutCmd
     else
       cloneCmd
 
-    val commands = gitCmd + "\n" + buildInfo.commands
+    println(buildInfo.commands.getBytes.toSeq)
 
-    val scriptFile = File.createTempFile(s"build-${ buildInfo.id }-script", ".sh", projectsDir)
+    val commands = gitCmd + Properties.lineSeparator +
+      buildInfo.commands.replaceAll("""\r|\n|\r\n""", Properties.lineSeparator)
+
+    val scriptFile = File.createTempFile(s"build-${buildInfo.id}-script", ".sh", projectsDir)
 
     val wr = new java.io.FileWriter(scriptFile)
     wr.write(commands)
     wr.flush
-
 
     if (exec(scriptFile))
       state = State.Success

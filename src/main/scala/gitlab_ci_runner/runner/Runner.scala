@@ -21,7 +21,7 @@ object Runner extends App {
       updateBuild()
     else
       getBuild()
-    Thread.sleep(5000)
+    Thread.sleep(30000)
     waitForBuild()
   }
 

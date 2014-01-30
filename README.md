@@ -9,10 +9,11 @@ HOWEVER AT THE MOMENT IT RUNS SCRIPTS VIA sh, SO IT NEEDS LINUX, CYGWIN, ETC.
 
 You can make it work on windows by creating a batch file named sh that executes its third parameter. Something like this:
 
-# SH.BAT
+````
+REM SH.BAT
 copy %3 build.bat
 build.bat
-
+````
 
 
 Note: It does not generate SSH keys for you. It expects to find the public key in $HOME/.ssh/id_rsa.pub.

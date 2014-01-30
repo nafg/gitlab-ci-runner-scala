@@ -7,7 +7,7 @@ Because it runs on the JVM, it's platform agnostic.
 
 HOWEVER AT THE MOMENT IT RUNS SCRIPTS VIA sh, SO IT NEEDS LINUX, CYGWIN, ETC.
 
-You can make it work on windows by creating a batch file named sh that executes its third parameter. Something like this:
+You can make it work on windows by creating a batch file named sh that executes its third parameter. Something like this (not tested):
 
 ````
 REM SH.BAT

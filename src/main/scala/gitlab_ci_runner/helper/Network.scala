@@ -17,7 +17,7 @@ import uk.co.bigbeeconsultants.http.request.RequestBody
 object Network {
   JSON.globalNumberParser = _.toInt
 
-  private def request(url: String, content: Map[String, String])(makeReq: (URL, RequestBody) => Request) = {
+  private def request(url: String, content: Map[String, String] = Map.empty)(makeReq: (URL, RequestBody) => Request) = {
     val httpClient = new HttpClient
     val req = makeReq(new URL(url), RequestBody(content, MediaType.APPLICATION_FORM_URLENCODED))
     val resp = httpClient.makeRequest(req)
@@ -71,15 +71,25 @@ object Network {
               if (obj.keySet == Set("message")) {
                 println("ERROR: " + obj("message"))
                 None
-              } else if (Set("id", "project_id", "commands", "repo_url", "sha", "ref") subsetOf obj.keySet)
+              } else if (Set("id", "project_id", "commands", "repo_url", "sha", "ref") subsetOf obj.keySet) {
+                val timeout = scala.util.Try {
+                  request(apiUrl + "/projects/" + obj("id").toString)((url, _) => Request.get(url)) flatMap { resp =>
+                    JSON.parseRaw(resp) flatMap {
+                      case JSONObject(obj) => Some(obj("timeout").toString.toInt)
+                      case _               => None
+                    }
+                  }
+                }.toOption.flatten getOrElse 7200
                 Some(BuildInfo(
                   id = obj("id").toString.toInt,
                   projectId = obj("project_id").toString.toInt,
                   commands = obj("commands").toString,
                   repoUrl = obj("repo_url").toString,
                   reference = obj("sha").toString,
-                  refName = obj("ref").toString))
-              else {
+                  refName = obj("ref").toString,
+                  timeout = timeout
+                ))
+              } else {
                 println("Unrecognized response: " + obj)
                 None
               }
@@ -101,7 +111,7 @@ object Network {
     val stateStr = state match {
       case State.Running => "running"
       case State.Success => "success"
-      case State.Failed => "failed"
+      case State.Failed  => "failed"
       case State.Waiting => "waiting"
     }
     val putBody = Map("token" -> Config.token, "state" -> stateStr, "trace" -> trace)

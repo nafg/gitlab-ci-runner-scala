@@ -3,12 +3,12 @@ package gitlab_ci_runner.runner
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
-
 import scala.collection.mutable.ListBuffer
 import scala.util.Properties
-
 import gitlab_ci_runner.conf.Config
 import gitlab_ci_runner.helper.json.BuildInfo
+import java.util.Timer
+import java.util.TimerTask
 
 class Build(val buildInfo: BuildInfo) {
 
@@ -26,9 +26,10 @@ class Build(val buildInfo: BuildInfo) {
 
   var state: State = State.Waiting
 
-  var timeout = 7200 //TODO
+  val timeout = buildInfo.timeout
 
   def run() = {
+    println("Running build: " + buildInfo)
     state = State.Running
 
     projectsDir.mkdirs()
@@ -75,9 +76,12 @@ class Build(val buildInfo: BuildInfo) {
     val proc = p.start()
     val startTime = System.currentTimeMillis()
     val out = new BufferedReader(new InputStreamReader(proc.getInputStream()))
-    def loop: Int = {
-      if (System.currentTimeMillis() - startTime >= timeout * 1000)
-        proc.destroy()
+    val timer = new Timer
+    val timeoutTask = new TimerTask {
+      def run = proc.destroy()
+    }
+    timer.schedule(timeoutTask, timeout * 1000)
+    def loop(): Int = {
       out.readLine() match {
         case null =>
           proc.waitFor()
@@ -85,13 +89,15 @@ class Build(val buildInfo: BuildInfo) {
         case line =>
           println(line)
           output += line
-          loop
+          loop()
       }
     }
-    loop == 0
+    val ret = loop()
+    timer.cancel()
+    ret == 0
   } catch {
     case e: Exception =>
-      println(e)
+      Console.err.println(e)
       false
   }
 

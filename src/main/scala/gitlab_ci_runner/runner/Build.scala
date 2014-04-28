@@ -28,7 +28,7 @@ class Build(val buildInfo: BuildInfo) {
 
   var timeout = 7200 //TODO
 
-  def run = {
+  def run() = {
     state = State.Running
 
     projectsDir.mkdirs()

@@ -5,7 +5,7 @@ import gitlab_ci_runner.conf.Config
 
 object Runner extends App {
   var build: Build = _
-  
+
   Config.loadConfig
 
   println("* GitLab CI runner started")
@@ -41,7 +41,7 @@ object Runner extends App {
     build = new Build(binfo)
     println(s"[${new java.util.Date().toString}] Build ${binfo.id} started...")
     new Thread {
-      override def run = build.run
+      override def run() = build.run()
     }.start
   }
 }

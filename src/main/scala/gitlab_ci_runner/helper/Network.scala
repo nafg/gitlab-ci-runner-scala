@@ -2,7 +2,6 @@ package gitlab_ci_runner
 package helper
 
 import java.net.URL
-import java.net.URLEncoder
 
 import scala.util.parsing.json.JSON
 import scala.util.parsing.json.JSONObject
@@ -11,9 +10,6 @@ import gitlab_ci_runner.conf.Config
 import gitlab_ci_runner.helper.json.BuildInfo
 import gitlab_ci_runner.runner.State
 import uk.co.bigbeeconsultants.http.HttpClient
-import uk.co.bigbeeconsultants.http.header.HeaderName.ACCEPT
-import uk.co.bigbeeconsultants.http.header.HeaderName.CONTENT_TYPE
-import uk.co.bigbeeconsultants.http.header.Headers
 import uk.co.bigbeeconsultants.http.header.MediaType
 import uk.co.bigbeeconsultants.http.request.Request
 import uk.co.bigbeeconsultants.http.request.RequestBody
@@ -21,7 +17,7 @@ import uk.co.bigbeeconsultants.http.request.RequestBody
 object Network {
   JSON.globalNumberParser = _.toInt
 
-  private def request(url: String, content: String)(makeReq: (URL, RequestBody) => Request) = {
+  private def request(url: String, content: Map[String, String])(makeReq: (URL, RequestBody) => Request) = {
     val httpClient = new HttpClient
     val req = makeReq(new URL(url), RequestBody(content, MediaType.APPLICATION_FORM_URLENCODED))
     val resp = httpClient.makeRequest(req)
@@ -31,13 +27,13 @@ object Network {
       None
   }
 
-  private def put(url: String, content: String): Option[String] = try {
+  private def put(url: String, content: Map[String, String]): Option[String] = try {
     request(url, content)((url, body) => Request.put(url, body))
   } catch {
     case e: Exception => None
   }
 
-  private def post(url: String, content: String, tries: Int = 5): Option[String] =
+  private def post(url: String, content: Map[String, String], tries: Int = 5): Option[String] =
     if (tries <= 0) None else try {
       request(url, content)((url, body) => Request.post(url, Some(body)))
     } catch {
@@ -50,7 +46,7 @@ object Network {
   private def apiUrl = Config.url + (if (Config.url.endsWith("/")) "" else "/") + "api/v1"
 
   def registerRunner(pubKey: String, token: String): Option[String] = {
-    val postBody = s"token=${URLEncoder.encode(token)}&public_key=${URLEncoder.encode(pubKey)}"
+    val postBody = Map("token" -> token, "public_key" -> pubKey)
     post(apiUrl + "/runners/register.json", postBody) flatMap JSON.parseRaw flatMap {
       case JSONObject(resp) =>
         try {
@@ -63,7 +59,7 @@ object Network {
   }
 
   def getBuild: Option[BuildInfo] = {
-    val postBody = s"token=${URLEncoder.encode(Config.token)}"
+    val postBody = Map("token" -> Config.token)
     post(apiUrl + "/builds/register.json", postBody) flatMap {
       case "" =>
         println("Nothing")
@@ -108,7 +104,7 @@ object Network {
       case State.Failed => "failed"
       case State.Waiting => "waiting"
     }
-    val putBody = s"token=${URLEncoder.encode(Config.token)}&state=${stateStr}&trace=${URLEncoder.encode(trace)}"
+    val putBody = Map("token" -> Config.token, "state" -> stateStr, "trace" -> trace)
     def attempt(tries: Int): Boolean = if (tries == 0) false else (try {
       put(s"$apiUrl/builds/$id.json", putBody).isDefined
     } catch { case e: Exception => false }) || {

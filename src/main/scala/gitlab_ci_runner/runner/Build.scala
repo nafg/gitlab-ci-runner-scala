@@ -9,10 +9,12 @@ import gitlab_ci_runner.conf.Config
 import gitlab_ci_runner.helper.json.BuildInfo
 import java.util.Timer
 import java.util.TimerTask
+import java.io.FileWriter
+import java.io.BufferedWriter
+import gitlab_ci_runner.helper.Network
 
 class Build(val buildInfo: BuildInfo) {
-
-  private var _completed = false
+  @volatile private var _completed = false
 
   def completed = _completed
 
@@ -44,11 +46,13 @@ class Build(val buildInfo: BuildInfo) {
     val commands = gitCmd + Properties.lineSeparator +
       buildInfo.commands.replaceAll("""\r|\n|\r\n""", Properties.lineSeparator)
 
-    val scriptFile = File.createTempFile(s"build-${buildInfo.id}-script", ".sh", projectsDir)
+    val ext = if (Properties.isWin) "bat" else "sh"
+    val scriptFile = new File(projectDir, s"build-${buildInfo.id}-script." + ext)
 
-    val wr = new java.io.FileWriter(scriptFile)
+    val wr = new FileWriter(scriptFile)
     wr.write(commands)
     wr.flush
+    wr.close
 
     if (exec(scriptFile))
       state = State.Success
@@ -59,7 +63,14 @@ class Build(val buildInfo: BuildInfo) {
   }
 
   def exec(script: File) = try {
-    val p = new ProcessBuilder("sh", "-x", "-e", script.getAbsolutePath)
+    val cmdLine = if (Properties.isWin)
+      Array("cmd /c " + script.getAbsolutePath())
+    else
+      Array("sh", "-x", "-e", script.getAbsolutePath)
+    val p = new ProcessBuilder(cmdLine: _*)
+
+    val logFile = new File(projectDir, s"build-${buildInfo.id}-out.log")
+    val wr = new BufferedWriter(new FileWriter(logFile))
 
     p.directory(projectsDir)
 
@@ -80,20 +91,29 @@ class Build(val buildInfo: BuildInfo) {
     val timeoutTask = new TimerTask {
       def run = proc.destroy()
     }
+    def pushState() = Network.pushBuild(buildInfo.id, state, outputStr)
+    val pushTask = new TimerTask {
+      def run = pushState()
+    }
     timer.schedule(timeoutTask, timeout * 1000)
+    timer.scheduleAtFixedRate(pushTask, 0, 30000)
     def loop(): Int = {
       out.readLine() match {
         case null =>
           proc.waitFor()
           proc.exitValue()
         case line =>
-          println(line)
+          wr.write(line)
+          wr.newLine()
           output += line
           loop()
       }
     }
     val ret = loop()
     timer.cancel()
+    pushState()
+    wr.flush()
+    wr.close()
     ret == 0
   } catch {
     case e: Exception =>

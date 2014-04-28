@@ -26,7 +26,7 @@ object Runner extends App {
           println(s"[${new java.util.Date().toString}] Build ${binfo.id} started...")
           try b.run()
           finally {
-            println(s"[${new java.util.Date().toString}] Build ${binfo.id} ended")
+            println(s"[${new java.util.Date().toString}] Build ${binfo.id} ended, state = ${b.state}")
             synchronized {
               builds -= b
             }

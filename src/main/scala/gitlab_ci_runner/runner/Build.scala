@@ -3,6 +3,7 @@ package gitlab_ci_runner.runner
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
+import java.io.{ StringWriter, PrintWriter }
 import scala.collection.mutable.ListBuffer
 import scala.util.Properties
 import gitlab_ci_runner.conf.Config
@@ -16,8 +17,6 @@ import gitlab_ci_runner.helper.Network
 class Build(val buildInfo: BuildInfo) {
   @volatile private var _completed = false
 
-  def completed = _completed
-
   private val output = ListBuffer.empty[String]
 
   def outputStr = output.map(_ + "\n").mkString
@@ -30,7 +29,15 @@ class Build(val buildInfo: BuildInfo) {
 
   val timeout = buildInfo.timeout
 
-  def run() = {
+  def logException(e: Exception) = {
+    val writer = new StringWriter()
+    val printWriter = new PrintWriter(writer)
+    e.printStackTrace(printWriter)
+    output += writer.toString
+    Console.err.println(e)
+  }
+
+  def run() = try {
     println("Running build: " + buildInfo)
     state = State.Running
 
@@ -41,13 +48,11 @@ class Build(val buildInfo: BuildInfo) {
     else
       cloneCmd
 
-    println(buildInfo.commands.getBytes.toSeq)
-
     val commands = gitCmd + Properties.lineSeparator +
       buildInfo.commands.replaceAll("""\r|\n|\r\n""", Properties.lineSeparator)
 
     val ext = if (Properties.isWin) "bat" else "sh"
-    val scriptFile = new File(projectDir, s"build-${buildInfo.id}-script." + ext)
+    val scriptFile = new File(projectsDir, s"build-${buildInfo.projectId}-${buildInfo.id}-script." + ext)
 
     val wr = new FileWriter(scriptFile)
     wr.write(commands)
@@ -58,9 +63,15 @@ class Build(val buildInfo: BuildInfo) {
       state = State.Success
     else
       state = State.Failed
-
-    _completed = true
+  } catch {
+    case e: Exception =>
+      state = State.Failed
+      logException(e)
+  } finally {
+    pushState()
   }
+
+  def pushState() = Network.pushBuild(buildInfo.id, state, outputStr)
 
   def exec(script: File) = try {
     val cmdLine = if (Properties.isWin)
@@ -69,7 +80,7 @@ class Build(val buildInfo: BuildInfo) {
       Array("sh", "-x", "-e", script.getAbsolutePath)
     val p = new ProcessBuilder(cmdLine: _*)
 
-    val logFile = new File(projectDir, s"build-${buildInfo.id}-out.log")
+    val logFile = new File(projectsDir, s"build-${buildInfo.projectId}-${buildInfo.id}-out.log")
     val wr = new BufferedWriter(new FileWriter(logFile))
 
     p.directory(projectsDir)
@@ -91,7 +102,6 @@ class Build(val buildInfo: BuildInfo) {
     val timeoutTask = new TimerTask {
       def run = proc.destroy()
     }
-    def pushState() = Network.pushBuild(buildInfo.id, state, outputStr)
     val pushTask = new TimerTask {
       def run = pushState()
     }
@@ -100,24 +110,26 @@ class Build(val buildInfo: BuildInfo) {
     def loop(): Int = {
       out.readLine() match {
         case null =>
+          println("Read null")
           proc.waitFor()
           proc.exitValue()
         case line =>
+          println("Read " + line)
           wr.write(line)
           wr.newLine()
           output += line
           loop()
       }
     }
+    println("starting loop")
     val ret = loop()
     timer.cancel()
-    pushState()
     wr.flush()
     wr.close()
     ret == 0
   } catch {
     case e: Exception =>
-      Console.err.println(e)
+      logException(e)
       false
   }
 

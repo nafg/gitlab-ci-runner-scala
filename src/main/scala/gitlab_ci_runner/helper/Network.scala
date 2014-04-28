@@ -72,7 +72,7 @@ object Network {
                 None
               } else if (Set("id", "project_id", "commands", "repo_url", "sha", "ref") subsetOf obj.keySet) {
                 val timeout = scala.util.Try {
-                  request(apiUrl + "/projects/" + obj("id").toString)((url, _) => Request.get(url)) flatMap { resp =>
+                  request(apiUrl + "/projects/" + obj("project_id").toString)((url, _) => Request.get(url)) flatMap { resp =>
                     JSON.parseRaw(resp) flatMap {
                       case JSONObject(obj) => Some(obj("timeout").toString.toInt)
                       case _               => None

@@ -110,11 +110,9 @@ class Build(val buildInfo: BuildInfo) {
     def loop(): Int = {
       out.readLine() match {
         case null =>
-          println("Read null")
           proc.waitFor()
           proc.exitValue()
         case line =>
-          println("Read " + line)
           wr.write(line)
           wr.newLine()
           output += line

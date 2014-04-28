@@ -2,10 +2,8 @@ package gitlab_ci_runner
 package helper
 
 import java.net.URL
-
 import scala.util.parsing.json.JSON
 import scala.util.parsing.json.JSONObject
-
 import gitlab_ci_runner.conf.Config
 import gitlab_ci_runner.helper.json.BuildInfo
 import gitlab_ci_runner.runner.State
@@ -13,6 +11,7 @@ import uk.co.bigbeeconsultants.http.HttpClient
 import uk.co.bigbeeconsultants.http.header.MediaType
 import uk.co.bigbeeconsultants.http.request.Request
 import uk.co.bigbeeconsultants.http.request.RequestBody
+import scala.util.Try
 
 object Network {
   JSON.globalNumberParser = _.toInt
@@ -115,11 +114,15 @@ object Network {
       case State.Waiting => "waiting"
     }
     val putBody = Map("token" -> Config.token, "state" -> stateStr, "trace" -> trace)
-    def attempt(tries: Int): Boolean = if (tries == 0) false else (try {
-      put(s"$apiUrl/builds/$id.json", putBody).isDefined
-    } catch { case e: Exception => false }) || {
-      Thread.sleep(1000)
-      attempt(tries - 1)
+    def attempt(tries: Int): Boolean = if (tries == 0) false else {
+      val putted = Try {
+        put(s"$apiUrl/builds/$id.json", putBody).isDefined
+      }.getOrElse(false)
+      putted || {
+        Console.err.println("Pushing build state failed, trying again $tries times")
+        Thread.sleep(1000)
+        attempt(tries - 1)
+      }
     }
     attempt(5)
   }

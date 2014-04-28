@@ -8,6 +8,9 @@ object Runner extends App {
 
   Config.loadConfig
 
+  if(!Config.isConfigured)
+    Setup.main(Array.empty)
+
   println("* GitLab CI runner started")
   println("* Waiting for builds")
   waitForBuild()

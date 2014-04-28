@@ -106,7 +106,7 @@ class Build(val buildInfo: BuildInfo) {
       def run = pushState()
     }
     timer.schedule(timeoutTask, timeout * 1000)
-    timer.scheduleAtFixedRate(pushTask, 0, 30000)
+    timer.scheduleAtFixedRate(pushTask, 0, 5000)
     def loop(): Int = {
       out.readLine() match {
         case null =>
@@ -119,7 +119,6 @@ class Build(val buildInfo: BuildInfo) {
           loop()
       }
     }
-    println("starting loop")
     val ret = loop()
     timer.cancel()
     wr.flush()

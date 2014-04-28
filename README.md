@@ -5,16 +5,7 @@ A runner for GitLab CI written in Scala (based on https://github.com/virtualmarc
 
 Because it runs on the JVM, it's platform agnostic.
 
-HOWEVER AT THE MOMENT IT RUNS SCRIPTS VIA sh, SO IT NEEDS LINUX, CYGWIN, ETC.
-
-You can make it work on windows by creating a batch file named sh that executes its third parameter. Something like this (not tested):
-
-````
-REM SH.BAT
-copy %3 build.bat
-build.bat
-````
-
+It uses sh by default. On Windows it should use cmd /c <scriptfile> (not tested though)
 
 Note: It does not generate SSH keys for you. It expects to find the public key in $HOME/.ssh/id_rsa.pub.
 
@@ -23,5 +14,3 @@ Usage:
  - Run `java -cp /path/to/gitlabci-runner.jar gitlab_ci_runner.runner.Setup`
    (you can enter the url and token interactively, or pass them on the command line in that order).
  - Run `java -jar /path/to/gitlabci-runner.jar` to start the runner.
-
- 

@@ -75,7 +75,7 @@ class Build(val buildInfo: BuildInfo) {
 
   def exec(script: File) = try {
     val cmdLine = if (Properties.isWin)
-      Array("cmd /c " + script.getAbsolutePath())
+      Array("cmd", "/c", script.getAbsolutePath())
     else
       Array("sh", "-x", "-e", script.getAbsolutePath)
     val p = new ProcessBuilder(cmdLine: _*)
